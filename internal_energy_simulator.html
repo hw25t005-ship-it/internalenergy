@@ -1,0 +1,263 @@
+
+<style>
+  .sim-wrap { padding: 1rem 0; font-family: var(--font-sans); }
+  .top-row { display: flex; gap: 16px; align-items: flex-start; }
+  .box-container { position: relative; width: 320px; height: 320px; border: 2.5px solid var(--color-border-primary); border-radius: var(--border-radius-md); overflow: hidden; background: #f7f5f0; flex-shrink: 0; }
+  @media (prefers-color-scheme: dark) { .box-container { background: #1a1a1a; } }
+  canvas { position: absolute; top: 0; left: 0; }
+  .right-panel { flex: 1; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .thermometer-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .thermo-label { font-size: 13px; color: var(--color-text-secondary); font-weight: 500; }
+  .thermo-outer { width: 32px; height: 180px; border: 2px solid var(--color-border-primary); border-radius: 16px; position: relative; overflow: hidden; background: var(--color-background-primary); }
+  .thermo-fill { position: absolute; bottom: 0; left: 0; width: 100%; border-radius: 0 0 14px 14px; transition: height 0.3s, background 0.3s; }
+  .thermo-temp { font-size: 20px; font-weight: 500; color: var(--color-text-primary); }
+  .energy-box { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 12px 16px; }
+  .energy-label { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 4px; }
+  .energy-bar-bg { height: 8px; border-radius: 4px; background: var(--color-border-tertiary); overflow: hidden; }
+  .energy-bar { height: 100%; border-radius: 4px; transition: width 0.3s, background 0.3s; }
+  .energy-val { font-size: 18px; font-weight: 500; color: var(--color-text-primary); margin-top: 6px; }
+  .heat-ctrl { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 14px 16px; }
+  .ctrl-label { font-size: 13px; color: var(--color-text-secondary); margin-bottom: 10px; display: flex; justify-content: space-between; }
+  .heat-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  .heat-btn { flex: 1; padding: 8px 0; font-size: 13px; font-weight: 500; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary); color: var(--color-text-primary); cursor: pointer; transition: background 0.15s; min-width: 60px; }
+  .heat-btn:hover { background: var(--color-background-secondary); }
+  .heat-btn.active { background: #E24B4A; color: #fff; border-color: #E24B4A; }
+  .info-box { border-left: 3px solid; padding: 10px 14px; border-radius: 0 var(--border-radius-md) var(--border-radius-md) 0; }
+  .info-box.low { border-color: #378ADD; background: #E6F1FB; color: #0C447C; }
+  .info-box.mid { border-color: #EF9F27; background: #FAEEDA; color: #633806; }
+  .info-box.high { border-color: #E24B4A; background: #FCEBEB; color: #791F1F; }
+  @media (prefers-color-scheme: dark) {
+    .info-box.low { border-color: #378ADD; background: #042C53; color: #B5D4F4; }
+    .info-box.mid { border-color: #EF9F27; background: #412402; color: #FAC775; }
+    .info-box.high { border-color: #E24B4A; background: #501313; color: #F7C1C1; }
+  }
+  .info-text { font-size: 13px; line-height: 1.5; }
+  .bottom-row { margin-top: 12px; display: flex; gap: 12px; align-items: center; }
+  .legend { display: flex; gap: 12px; font-size: 12px; color: var(--color-text-secondary); align-items: center; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+</style>
+
+<div class="sim-wrap">
+  <div class="top-row">
+    <div class="box-container">
+      <canvas id="simCanvas" width="320" height="320"></canvas>
+    </div>
+    <div class="right-panel">
+      <div style="display:flex; gap:12px; align-items:flex-start;">
+        <div class="thermometer-wrap">
+          <div class="thermo-label">온도</div>
+          <div class="thermo-outer">
+            <div class="thermo-fill" id="thermoFill" style="height:10%; background:#378ADD;"></div>
+          </div>
+          <div class="thermo-temp" id="tempVal">100 K</div>
+        </div>
+        <div style="flex:1; display:flex; flex-direction:column; gap:10px;">
+          <div class="energy-box">
+            <div class="energy-label">내부 에너지 (U)</div>
+            <div class="energy-bar-bg"><div class="energy-bar" id="energyBar" style="width:10%; background:#378ADD;"></div></div>
+            <div class="energy-val" id="energyVal">낮음</div>
+          </div>
+          <div class="energy-box">
+            <div class="energy-label">평균 분자 속력</div>
+            <div class="energy-bar-bg"><div class="energy-bar" id="speedBar" style="width:10%; background:#378ADD;"></div></div>
+            <div class="energy-val" id="speedVal">느림</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="heat-ctrl">
+        <div class="ctrl-label">
+          <span>열 공급량 (Q)</span>
+          <span id="heatLabel" style="font-weight:500; color:var(--color-text-primary);">없음</span>
+        </div>
+        <div class="heat-btns">
+          <button class="heat-btn active" id="btn0" onclick="setHeat(0)">없음</button>
+          <button class="heat-btn" id="btn1" onclick="setHeat(1)">약함</button>
+          <button class="heat-btn" id="btn2" onclick="setHeat(2)">중간</button>
+          <button class="heat-btn" id="btn3" onclick="setHeat(3)">강함</button>
+          <button class="heat-btn" id="btn4" onclick="setHeat(4)">매우 강함</button>
+        </div>
+      </div>
+
+      <div class="info-box low" id="infoBox">
+        <div class="info-text" id="infoText">열을 공급하지 않으면 분자들은 <strong>낮은 운동 에너지</strong>로 천천히 움직입니다. 내부 에너지가 낮고 온도도 낮습니다.</div>
+      </div>
+    </div>
+  </div>
+  <div class="bottom-row">
+    <div class="legend">
+      <span><span class="legend-dot" style="background:#378ADD;"></span>저에너지 분자</span>
+      <span><span class="legend-dot" style="background:#EF9F27;"></span>중에너지 분자</span>
+      <span><span class="legend-dot" style="background:#E24B4A;"></span>고에너지 분자</span>
+    </div>
+    <button onclick="resetSim()" style="margin-left:auto; font-size:12px; padding:6px 12px; border:0.5px solid var(--color-border-secondary); background:var(--color-background-primary); color:var(--color-text-secondary); border-radius:var(--border-radius-md); cursor:pointer;">초기화</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('simCanvas');
+const ctx = canvas.getContext('2d');
+const N = 20;
+let heatLevel = 0;
+let particles = [];
+let animId;
+
+const heatConfig = [
+  { temp: 100, label: '없음', energyLabel: '낮음', speedLabel: '느림', infoClass: 'low', info: '열을 공급하지 않으면 분자들은 <strong>낮은 운동 에너지</strong>로 천천히 움직입니다. 내부 에너지가 낮고 온도도 낮습니다.' },
+  { temp: 250, label: '약함', energyLabel: '낮음', speedLabel: '느림', infoClass: 'low', info: '약한 열 공급 → 분자 운동이 조금 빨라집니다. <strong>내부 에너지↑, 온도↑</strong>' },
+  { temp: 450, label: '중간', energyLabel: '중간', speedLabel: '보통', infoClass: 'mid', info: '중간 열 공급 → 분자들이 활발히 충돌합니다. <strong>내부 에너지↑↑, 온도↑↑</strong>' },
+  { temp: 700, label: '강함', energyLabel: '높음', speedLabel: '빠름', infoClass: 'mid', info: '강한 열 공급 → 대부분의 분자가 빠르게 운동합니다. <strong>내부 에너지↑↑↑, 온도↑↑↑</strong>' },
+  { temp: 1000, label: '매우 강함', energyLabel: '매우 높음', speedLabel: '매우 빠름', infoClass: 'high', info: '매우 강한 열 공급 → 분자들이 격렬히 충돌합니다! <strong>내부 에너지 최대, 온도 최대</strong>' },
+];
+
+function baseSpeed(level) {
+  return [0.6, 1.3, 2.4, 4.0, 6.5][level];
+}
+
+function particleColor(speed, maxSpeed) {
+  const r = speed / maxSpeed;
+  if (r < 0.4) return '#378ADD';
+  if (r < 0.75) return '#EF9F27';
+  return '#E24B4A';
+}
+
+function initParticles(level) {
+  const bs = baseSpeed(level);
+  particles = [];
+  for (let i = 0; i < N; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speedMult = 0.4 + Math.random() * 1.2;
+    const spd = bs * speedMult;
+    particles.push({
+      x: 16 + Math.random() * 288,
+      y: 16 + Math.random() * 288,
+      vx: Math.cos(angle) * spd,
+      vy: Math.sin(angle) * spd,
+      r: 7,
+    });
+  }
+}
+
+function isDarkMode() {
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+function draw() {
+  ctx.clearRect(0, 0, 320, 320);
+  const dark = isDarkMode();
+  const bgColor = dark ? '#1a1a1a' : '#f7f5f0';
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(0, 0, 320, 320);
+
+  const bs = baseSpeed(heatLevel);
+  const maxSpeed = bs * 1.8;
+
+  for (const p of particles) {
+    p.x += p.vx;
+    p.y += p.vy;
+    if (p.x - p.r < 0) { p.x = p.r; p.vx = Math.abs(p.vx); }
+    if (p.x + p.r > 320) { p.x = 320 - p.r; p.vx = -Math.abs(p.vx); }
+    if (p.y - p.r < 0) { p.y = p.r; p.vy = Math.abs(p.vy); }
+    if (p.y + p.r > 320) { p.y = 320 - p.r; p.vy = -Math.abs(p.vy); }
+
+    const spd = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+    const col = particleColor(spd, maxSpeed);
+
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fillStyle = col;
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.strokeStyle = dark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  if (heatLevel > 0) {
+    const intensity = heatLevel / 4;
+    const alpha = 0.04 + intensity * 0.07;
+    const grad = ctx.createRadialGradient(160, 320, 20, 160, 320, 200);
+    grad.addColorStop(0, `rgba(226,75,74,${alpha * 1.5})`);
+    grad.addColorStop(1, 'rgba(226,75,74,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 320, 320);
+
+    for (let f = 0; f < heatLevel * 2; f++) {
+      const fx = 60 + Math.random() * 200;
+      const fy = 290 + Math.random() * 20;
+      const fh = 8 + Math.random() * heatLevel * 8;
+      ctx.beginPath();
+      ctx.moveTo(fx, fy);
+      ctx.lineTo(fx - 3, fy - fh * 0.6);
+      ctx.lineTo(fx, fy - fh);
+      ctx.lineTo(fx + 3, fy - fh * 0.6);
+      ctx.closePath();
+      ctx.fillStyle = `rgba(239,159,39,${0.3 + Math.random() * 0.3})`;
+      ctx.fill();
+    }
+  }
+
+  animId = requestAnimationFrame(draw);
+}
+
+function updateUI(level) {
+  const cfg = heatConfig[level];
+  const pct = (cfg.temp - 100) / 900;
+
+  const thermoH = 10 + pct * 88;
+  const thermoFill = document.getElementById('thermoFill');
+  thermoFill.style.height = thermoH + '%';
+  const r = Math.round(55 + pct * 171);
+  const g = Math.round(167 - pct * 93);
+  const b = Math.round(221 - pct * 147);
+  const col = `rgb(${r},${g},${b})`;
+  thermoFill.style.background = col;
+
+  document.getElementById('tempVal').textContent = cfg.temp + ' K';
+
+  const barPct = 10 + pct * 88;
+  document.getElementById('energyBar').style.width = barPct + '%';
+  document.getElementById('energyBar').style.background = col;
+  document.getElementById('energyVal').textContent = cfg.energyLabel;
+
+  document.getElementById('speedBar').style.width = barPct + '%';
+  document.getElementById('speedBar').style.background = col;
+  document.getElementById('speedVal').textContent = cfg.speedLabel;
+
+  document.getElementById('heatLabel').textContent = cfg.label;
+
+  const infoBox = document.getElementById('infoBox');
+  infoBox.className = 'info-box ' + cfg.infoClass;
+  document.getElementById('infoText').innerHTML = cfg.info;
+
+  for (let i = 0; i <= 4; i++) {
+    document.getElementById('btn' + i).classList.toggle('active', i === level);
+  }
+}
+
+function setHeat(level) {
+  heatLevel = level;
+  const bs = baseSpeed(level);
+  for (const p of particles) {
+    const angle = Math.atan2(p.vy, p.vx);
+    const mult = 0.4 + Math.random() * 1.2;
+    const spd = bs * mult;
+    p.vx = Math.cos(angle) * spd;
+    p.vy = Math.sin(angle) * spd;
+  }
+  updateUI(level);
+}
+
+function resetSim() {
+  heatLevel = 0;
+  initParticles(0);
+  updateUI(0);
+}
+
+initParticles(0);
+updateUI(0);
+if (animId) cancelAnimationFrame(animId);
+draw();
+</script>
